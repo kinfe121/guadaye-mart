@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-900 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Guadaye Baltina Mart Management System</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Google Fonts: Inter & Plus Jakarta Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            ethiopia: {
+              gold: '#D4AF37',
+              goldHover: '#B89628',
+              green: '#009A44',
+              red: '#DA121A',
+              warmDark: '#121417',
+              cardBg: '#1C1F26',
+              cardBorder: '#2E3440'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    /* Custom scrollbar and utilities for native mobile app feel */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(15, 23, 42, 0.6);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 9999px;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .tap-highlight-transparent {
+      -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+
+  <!-- Firebase Modular Scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { 
+      getAuth, 
+      signInAnonymously, 
+      signInWithCustomToken, 
+      onAuthStateChanged 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { 
+      getFirestore, 
+      collection, 
+      doc, 
+      setDoc, 
+      addDoc, 
+      updateDoc, 
+      deleteDoc, 
+      onSnapshot, 
+      serverTimestamp 
+    } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+// Firebase Initialization Setup
+    const firebaseConfig = {
+      apiKey: "AIzaSyCa4zXhFLTvp8eseRAQ-YEbOtzQZvaB4I8",
+      authDomain: "guadayemart.firebaseapp.com",
+      projectId: "guadayemart",
+      storageBucket: "guadayemart.firebasestorage.app",
+      messagingSenderId: "213102148191",
+      appId: "1:213102148191:web:cfbc402bd70af6028ef9ea"
+    };
+
+    let db = null;
+    let auth = null;
+    let currentUser = null;
+
+    // Initialize Firebase SDK
+    if (typeof firebase !== 'undefined' && firebaseConfig.apiKey) {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.firestore();
+      auth = firebase.auth();
+    }
+
+    window.GB_APP = {
+      isFirebaseReady: !!db,
+      appId: 'guadaye-baltina-prod',
+      db: db,
+      auth: auth
+    };
+
+    if (firebaseConfig) {
+      try {
+        const app = initializeApp(firebaseConfig);
+        db = getFirestore(app);
+        auth = getAuth(app);
+        window.GB_APP.db = db;
+        window.GB_APP.auth = auth;
+
+        const authPromise = typeof __initial_auth_token !== 'undefined' && __initial_auth_token
+          ? signInWithCustomToken(auth, __initial_auth_token)
+          : signInAnonymously(auth);
+
+        authPromise.then((cred) => {
+          currentUser = cred.user;
+          window.GB_APP.isFirebaseReady = true;
+          console.log("Firebase Auth & Firestore initialized successfully");
+          if (window.initDataListeners) window.initDataListeners();
+        }).catch(err => {
+          console.warn("Firebase Auth failed, falling back to local memory store:", err);
+        });
+      } catch (e) {
+        console.warn("Firebase config error, running in memory-only mode:", e);
+      }
+    }
+  </script>
+</head>
+<body class="h-full flex justify-center bg-black font-sans antialiased text-slate-100 select-none">
+
+  <!-- Mobile Viewport Container Shell -->
+  <div class="w-full max-w-md h-full bg-slate-950 flex flex-col relative overflow-hidden shadow-2xl border-x border-slate-800/80">
+    
+    <!-- Top App Bar & Header -->
+    <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-600 via-amber-500 to-emerald-600 p-0.5 flex items-center justify-center shadow-lg shadow-amber-500/20">
+          <div class="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
+            <i data-lucide="store" class="w-5 h-5 text-amber-400"></i>
+          </div>
+        </div>
+        <div>
+          <h1 class="font-extrabold text-base tracking-tight text-white flex items-center gap-1.5">
+            Guadaye Baltina
+            <span class="text-[10px] bg-amber-500/20 text-amber-400 border border-amber-500/30 font-bold px-1.5 py-0.5 rounded-md uppercase">Mart</span>
+          </h1>
+          <p class="text-[11px] text-slate-400 font-medium leading-none" id="roleBadgeText">Role: Admin (Mom)</p>
+        </div>
+      </div>
+
+<!-- Role Switcher Control -->
+      <div class="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60">
+        <button id="roleBtnAdmin" onclick="switchRole('admin')" class="px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all">
+          Mom
+        </button>
+        <button id="roleBtnShop" onclick="switchRole('shopkeeper')" class="px-2.5 py-1 text-xs font-semibold rounded-lg transition-all bg-amber-500 text-slate-950 shadow-sm">
+          Shop
+        </button>
+      </div>
+    </header>
+
+    <!-- Global System Status & Sync Bar -->
+    <div id="connectionBanner" class="bg-emerald-950/80 border-b border-emerald-800/50 px-3 py-1 flex items-center justify-between text-[11px] text-emerald-300">
+      <div class="flex items-center gap-1.5">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span id="syncStatusText">Live Data Sync Active</span>
+      </div>
+      <span class="text-slate-400 text-[10px]" id="appSessionUser">ID: Guest</span>
+    </div>
+
+    <!-- Main Content Dynamic View Area -->
+    <main class="flex-1 overflow-y-auto relative p-4 space-y-4 pb-24 no-scrollbar" id="mainContent">
+      
+      <!-- INVENTORY VIEW (Default Tab) -->
+      <section id="viewInventory" class="space-y-4">
+        
+        <!-- Search & Filter Controls -->
+        <div class="space-y-2.5">
+          <div class="relative">
+            <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input type="text" id="searchInput" oninput="renderItems()" placeholder="Search Shiro, Berbere, Butter..." class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors">
+          </div>
+
+          <!-- Status Filter Tabs -->
+          <div class="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
+            <button onclick="setFilter('all')" id="filterBtn-all" class="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold whitespace-nowrap transition-all">All</button>
+            <button onclick="setFilter('in_stock')" id="filterBtn-in_stock" class="px-3 py-1.5 rounded-lg bg-slate-900 text-slate-300 border border-slate-800 font-medium whitespace-nowrap transition-all">In Shop</button>
+            <button onclick="setFilter('out_of_stock')" id="filterBtn-out_of_stock" class="px-3 py-1.5 rounded-lg bg-slate-900 text-slate-300 border border-slate-800 font-medium whitespace-nowrap transition-all">Shop Out</button>
+            <button onclick="setFilter('factory_low')" id="filterBtn-factory_low" class="px-3 py-1.5 rounded-lg bg-slate-900 text-slate-300 border border-slate-800 font-medium whitespace-nowrap transition-all">Factory Low</button>
+            <button onclick="setFilter('in_transit')" id="filterBtn-in_transit" class="px-3 py-1.5 rounded-lg bg-slate-900 text-slate-300 border border-slate-800 font-medium whitespace-nowrap transition-all">In Transit</button>
+          </div>
+        </div>
+
+        <!-- Add Item Button for Admin -->
+        <div id="adminActionSection" class="hidden">
+          <button onclick="openAddItemModal()" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10 active:scale-[0.99] transition-transform">
+            <i data-lucide="plus-circle" class="w-5 h-5"></i>
+            Add New Baltina Item
+          </button>
+        </div>
+
+        <!-- Active Items Grid/List Container -->
+        <div id="itemsContainer" class="space-y-3">
+          <!-- Rendered Dynamically -->
+        </div>
+      </section>
+
+      <!-- SALES TRACKER & LOGS VIEW -->
+      <section id="viewSales" class="hidden space-y-4">
+        <!-- Sales Overview Metrics -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl relative overflow-hidden">
+            <div class="absolute -right-2 -bottom-2 opacity-10 text-amber-500">
+              <i data-lucide="banknote" class="w-16 h-16"></i>
+            </div>
+            <p class="text-xs text-slate-400 font-medium">Total Revenue</p>
+            <p class="text-xl font-extrabold text-amber-400 mt-1" id="statTotalRevenue">0.00 ETB</p>
+            <p class="text-[10px] text-slate-500 mt-0.5">Recorded today</p>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 p-3.5 rounded-2xl relative overflow-hidden">
+            <div class="absolute -right-2 -bottom-2 opacity-10 text-emerald-500">
+              <i data-lucide="shopping-bag" class="w-16 h-16"></i>
+            </div>
+            <p class="text-xs text-slate-400 font-medium">Items Sold</p>
+            <p class="text-xl font-extrabold text-emerald-400 mt-1" id="statTotalCount">0 Packs</p>
+            <p class="text-[10px] text-slate-500 mt-0.5">Total transactions</p>
+          </div>
+        </div>
+
+        <!-- Quick Log Sale Section for Shopkeeper & Admin -->
+        <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl space-y-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="shopping-cart" class="w-4 h-4 text-amber-400"></i>
+            Register New Sale Transaction
+          </h3>
+          <form id="saleForm" onsubmit="handleLogSale(event)" class="space-y-3">
+            <div>
+              <label class="block text-xs text-slate-400 mb-1 font-medium">Select Baltina Item</label>
+              <select id="saleItemSelect" onchange="updateSaleTotalCalculation()" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+                <option value="">-- Choose Item --</option>
+              </select>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs text-slate-400 mb-1 font-medium">Quantity (Kg/Packs)</label>
+                <input type="number" id="saleQtyInput" min="1" value="1" oninput="updateSaleTotalCalculation()" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+              </div>
+              <div>
+                <label class="block text-xs text-slate-400 mb-1 font-medium">Total (ETB)</label>
+                <div id="saleTotalCalculated" class="w-full bg-slate-800/60 border border-slate-700/50 rounded-xl p-2.5 text-sm font-bold text-amber-400 flex items-center">
+                  0.00 ETB
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm shadow-md shadow-emerald-900/20">
+              <i data-lucide="check-circle" class="w-4 h-4"></i>
+              Confirm & Record Sale
+            </button>
+          </form>
+        </div>
+
+        <!-- Live Sales Log History -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Live Sales History</h3>
+            <span class="text-[10px] text-slate-500">Real-time update</span>
+          </div>
+          <div id="salesHistoryList" class="space-y-2">
+            <!-- Dynamically populated sales log items -->
+          </div>
+        </div>
+      </section>
+
+      <!-- NOTIFICATIONS & FACTORY FEED VIEW -->
+      <section id="viewNotifications" class="hidden space-y-3">
+        <div class="flex items-center justify-between pb-1">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <i data-lucide="bell" class="w-4 h-4 text-amber-400"></i>
+            Stock Alerts & Factory Dispatch Feed
+          </h3>
+          <span id="notifBadge" class="text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded-full">0 Messages</span>
+        </div>
+
+        <div id="notificationsList" class="space-y-2.5">
+          <!-- Dynamically populated alerts list -->
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Navigation Bar (Mobile Native App Style) -->
+    <nav class="absolute bottom-0 left-0 right-0 z-30 bg-slate-900/95 backdrop-blur-lg border-t border-slate-800 py-2 px-4 flex justify-around items-center">
+      <button onclick="switchTab('inventory')" id="navTab-inventory" class="flex flex-col items-center gap-1 text-amber-400 transition-colors tap-highlight-transparent">
+        <i data-lucide="grid" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold">Mart Items</span>
+      </button>
+
+      <button onclick="switchTab('sales')" id="navTab-sales" class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors tap-highlight-transparent">
+        <i data-lucide="receipt" class="w-5 h-5"></i>
+        <span class="text-[10px] font-bold">Sales Log</span>
+      </button>
+
+      <button onclick="switchTab('notifications')" id="navTab-notifications" class="flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors relative tap-highlight-transparent">
+        <div class="relative">
+          <i data-lucide="bell" class="w-5 h-5"></i>
+          <span id="unreadDot" class="hidden absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-500 rounded-full border-2 border-slate-900"></span>
+        </div>
+        <span class="text-[10px] font-bold">Alerts</span>
+      </button>
+    </nav>
+
+    <!-- MODAL: Add / Edit Item (Mom / Admin) -->
+    <div id="itemModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-4 space-y-4 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 id="modalTitle" class="text-base font-bold text-white">Add New Baltina Product</h3>
+          <button onclick="closeItemModal()" class="text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <form id="itemForm" onsubmit="handleSaveItem(event)" class="space-y-3">
+          <input type="hidden" id="editItemId">
+          
+          <!-- Image Upload / Camera Preview -->
+          <div>
+            <label class="block text-xs text-slate-400 mb-1 font-medium">Item Photo (Capture or Upload)</label>
+            <div class="flex items-center gap-3">
+              <div id="imagePreviewContainer" class="w-16 h-16 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center overflow-hidden shrink-0">
+                <i data-lucide="image" class="w-6 h-6 text-slate-600" id="imagePlaceholderIcon"></i>
+                <img id="imagePreview" src="" alt="Preview" class="hidden w-full h-full object-cover">
+              </div>
+              <div class="flex-1">
+                <input type="file" id="itemImageInput" accept="image/*" capture="environment" onchange="handleImageSelected(event)" class="hidden">
+                <button type="button" onclick="document.getElementById('itemImageInput').click()" class="w-full bg-slate-800 hover:bg-slate-700 text-xs text-slate-200 font-semibold py-2 px-3 rounded-xl border border-slate-700 flex items-center justify-center gap-1.5">
+                  <i data-lucide="camera" class="w-4 h-4 text-amber-400"></i>
+                  Take / Pick Photo
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1 font-medium">Product Name (e.g. Shiro Medin, Mitmita)</label>
+            <input type="text" id="itemNameInput" placeholder="Enter product name" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1 font-medium">Price per Pack/Kg (ETB)</label>
+            <input type="number" step="0.5" id="itemPriceInput" placeholder="e.g. 450" required class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1 font-medium">Shop & Factory Status</label>
+            <select id="itemStatusInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+              <option value="in_stock">In Stock (Available at Shop)</option>
+              <option value="out_of_stock">Out of Stock at Shop</option>
+              <option value="in_transit">Restocking / In Transit from Factory</option>
+              <option value="factory_low">Low Stock at Factory</option>
+            </select>
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button type="button" onclick="closeItemModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">
+              Cancel
+            </button>
+            <button type="submit" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs shadow-md">
+              Save Item
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL: Update Factory Status / Dispatch (Mom / Admin) -->
+    <div id="statusModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-sm p-4 space-y-4 shadow-2xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 class="text-base font-bold text-white">Update Status & Dispatch</h3>
+          <button onclick="closeStatusModal()" class="text-slate-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+
+        <div class="space-y-3">
+          <p class="text-xs text-slate-300" id="statusModalItemName">Product Name</p>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1 font-medium">Select New Status</label>
+            <select id="modalStatusSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+              <option value="in_stock">✅ In Stock (Available at Shop)</option>
+              <option value="in_transit">🚚 Restocking / In Transit from Factory</option>
+              <option value="factory_low">⚠️ Low Stock at Factory (Packing soon)</option>
+              <option value="out_of_stock">❌ Out of Stock</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs text-slate-400 mb-1 font-medium">Optional Note for Shopkeeper</label>
+            <input type="text" id="modalStatusNote" placeholder="e.g., 20 bags prepared, driver on the way" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500">
+          </div>
+
+          <div class="pt-2 flex gap-2">
+            <button onclick="closeStatusModal()" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl text-xs">
+              Cancel
+            </button>
+            <button onclick="confirmStatusUpdate()" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2.5 rounded-xl text-xs">
+              Update & Notify
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast Container -->
+    <div id="toastContainer" class="fixed top-14 left-1/2 -translate-x-1/2 w-full max-w-xs z-50 pointer-events-none space-y-2 px-2"></div>
+  </div>
+
+  <!-- APPLICATION LOGIC SCRIPT -->
+  <script>
+    // System State Variables
+    let currentRole = 'shopkeeper'; // 'admin' (Mom) or 'shopkeeper'
+    let currentTab = 'inventory'; // 'inventory', 'sales', 'notifications'
+    let currentFilter = 'all';
+    let items = [];
+    let sales = [];
+    let notifications = [];
+    let base64Image = '';
+    let activeEditId = null;
+
+    // Default Seed Data (Traditional Ethiopian Baltina Products)
+    const initialSeedItems = [
+      {
+        id: 'item-1',
+        name: 'Special Shiro Powder (ሽሮ)',
+        price: 480,
+        status: 'in_stock', // in_stock, out_of_stock, in_transit, factory_low
+        image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=300&q=80',
+        updatedAt: Date.now()
+      },
+      {
+        id: 'item-2',
+        name: 'Pure Red Berbere (በርበሬ)',
+        price: 750,
+        status: 'in_transit',
+        image: 'https://images.unsplash.com/photo-1599940824399-b87987ceb72a?auto=format&fit=crop&w=300&q=80',
+        updatedAt: Date.now()
+      },
+      {
+        id: 'item-3',
+        name: 'Spiced Clarified Butter / Niter Kibbeh (ንጥር ቅቤ)',
+        price: 1200,
+        status: 'factory_low',
+        image: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?auto=format&fit=crop&w=300&q=80',
+        updatedAt: Date.now()
+      },
+      {
+        id: 'item-4',
+        name: 'Hot Mitmita (ሚጥሚጣ)',
+        price: 650,
+        status: 'in_stock',
+        image: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=300&q=80',
+        updatedAt: Date.now()
+      },
+      {
+        id: 'item-5',
+        name: 'Korarima Ground Spices (ኮረሪማ)',
+        price: 980,
+        status: 'out_of_stock',
+        image: 'https://images.unsplash.com/photo-1532336414038-cf19250c5757?auto=format&fit=crop&w=300&q=80',
+        updatedAt: Date.now()
+      }
+    ];
+
+    // Initialization on Page Load
+    window.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      loadInitialState();
+      updateRoleUI();
+      renderItems();
+      renderSales();
+      renderNotifications();
+      populateSaleItemDropdown();
+
+      // Setup window listeners for Firebase syncing
+      window.initDataListeners = setupFirebaseSync;
+    });
+
+    // Load Initial State from Memory / Seed Data
+    function loadInitialState() {
+      items = [...initialSeedItems];
+      notifications = [
+        {
+          id: 'notif-1',
+          title: 'Dispatch Alert',
+          message: 'Mom sent 30kg of Red Berbere to shop via courier.',
+          type: 'info',
+          time: new Date(Date.now() - 3600000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        }
+      ];
+      sales = [
+        {
+          id: 'sale-1',
+          itemName: 'Special Shiro Powder (ሽሮ)',
+          qty: 2,
+          total: 960,
+          timestamp: new Date(Date.now() - 7200000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+          sellerRole: 'Shopkeeper #1'
+        }
+      ];
+    }
+
+// Role Switching Function
+    function switchRole(role) {
+      // If switching to admin, require a password
+      if (role === 'admin') {
+        const password = prompt("Enter Admin Password for Mom:");
+        
+        // If user clicks Cancel, password will be null -> do nothing
+        if (password === null) return; 
+        
+        // Change "mom123" to whatever secret password you want
+        if (password !== "mom123") {
+          showToast("Incorrect password! Access denied.", "error");
+          return; // Stop here, do not switch role
+        }
+      }
+
+      currentRole = role;
+      const adminBtn = document.getElementById('roleBtnAdmin');
+      const shopBtn = document.getElementById('roleBtnShop');
+      const roleText = document.getElementById('roleBadgeText');
+
+      if (role === 'admin') {
+        adminBtn.className = "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all bg-amber-500 text-slate-950 shadow-sm";
+        shopBtn.className = "px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+        roleText.innerText = "Role: Admin (Mom)";
+        showToast("Switched to Admin (Mom) View", "info");
+      } else {
+        shopBtn.className = "px-2.5 py-1 text-xs font-semibold rounded-lg transition-all bg-amber-500 text-slate-950 shadow-sm";
+        adminBtn.className = "px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all";
+        roleText.innerText = "Role: Shopkeeper (Read-Only Inventory + Sales)";
+        showToast("Switched to Shopkeeper View", "info");
+      }
+
+      updateRoleUI();
+      renderItems();
+    }
+
+    function updateRoleUI() {
+      const adminSection = document.getElementById('adminActionSection');
+      if (currentRole === 'admin') {
+        adminSection.classList.remove('hidden');
+      } else {
+        adminSection.classList.add('hidden');
+      }
+    }
+
+    // Tab Navigation
+    function switchTab(tab) {
+      currentTab = tab;
+      
+      const vInv = document.getElementById('viewInventory');
+      const vSales = document.getElementById('viewSales');
+      const vNotif = document.getElementById('viewNotifications');
+
+      const tInv = document.getElementById('navTab-inventory');
+      const tSales = document.getElementById('navTab-sales');
+      const tNotif = document.getElementById('navTab-notifications');
+
+      [vInv, vSales, vNotif].forEach(v => v.classList.add('hidden'));
+      [tInv, tSales, tNotif].forEach(t => {
+        t.className = "flex flex-col items-center gap-1 text-slate-400 hover:text-slate-200 transition-colors tap-highlight-transparent";
+      });
+
+      if (tab === 'inventory') {
+        vInv.classList.remove('hidden');
+        tInv.className = "flex flex-col items-center gap-1 text-amber-400 transition-colors tap-highlight-transparent";
+      } else if (tab === 'sales') {
+        vSales.classList.remove('hidden');
+        tSales.className = "flex flex-col items-center gap-1 text-amber-400 transition-colors tap-highlight-transparent";
+      } else if (tab === 'notifications') {
+        vNotif.classList.remove('hidden');
+        tNotif.className = "flex flex-col items-center gap-1 text-amber-400 transition-colors tap-highlight-transparent";
+        document.getElementById('unreadDot').classList.add('hidden');
+      }
+    }
+
+    // Filter Logic
+    function setFilter(filter) {
+      currentFilter = filter;
+      const filterBtns = ['all', 'in_stock', 'out_of_stock', 'factory_low', 'in_transit'];
+      
+      filterBtns.forEach(f => {
+        const btn = document.getElementById(`filterBtn-${f}`);
+        if (f === filter) {
+          btn.className = "px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold whitespace-nowrap transition-all shadow-sm";
+        } else {
+          btn.className = "px-3 py-1.5 rounded-lg bg-slate-900 text-slate-300 border border-slate-800 font-medium whitespace-nowrap transition-all";
+        }
+      });
+
+      renderItems();
+    }
+
+    // Render Inventory Items
+    function renderItems() {
+      const container = document.getElementById('itemsContainer');
+      const searchVal = document.getElementById('searchInput').value.toLowerCase();
+
+      let filtered = items.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchVal);
+        const matchesFilter = currentFilter === 'all' || item.status === currentFilter;
+        return matchesSearch && matchesFilter;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-slate-500 space-y-2">
+            <i data-lucide="package-search" class="w-10 h-10 mx-auto text-slate-600"></i>
+            <p class="text-xs">No Baltina items match your search/filter criteria.</p>
+          </div>
+        `;
+        lucide.createIcons();
+        return;
+      }
+
+      container.innerHTML = filtered.map(item => {
+        const badge = getStatusBadge(item.status);
+        
+        let actionButtons = '';
+        if (currentRole === 'admin') {
+          actionButtons = `
+            <div class="flex items-center gap-1.5 pt-2 border-t border-slate-800/80 mt-2">
+              <button onclick="openStatusModal('${item.id}')" class="flex-1 bg-slate-800 hover:bg-slate-700 text-amber-400 font-semibold py-1.5 px-2 rounded-lg text-xs flex items-center justify-center gap-1">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Status / Dispatch
+              </button>
+              <button onclick="editItem('${item.id}')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg">
+                <i data-lucide="edit-3" class="w-3.5 h-3.5"></i>
+              </button>
+              <button onclick="deleteItem('${item.id}')" class="p-1.5 bg-rose-950/60 hover:bg-rose-900 text-rose-400 border border-rose-800/50 rounded-lg">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          `;
+        } else {
+          // Shopkeeper Role Actions
+          actionButtons = `
+            <div class="flex items-center gap-1.5 pt-2 border-t border-slate-800/80 mt-2">
+              <button onclick="requestStockAlert('${item.id}')" class="flex-1 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 text-rose-300 font-medium py-1.5 px-2 rounded-lg text-xs flex items-center justify-center gap-1">
+                <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-400"></i> Request Stock from Mom
+              </button>
+              <button onclick="quickLogSaleForItem('${item.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-1.5 px-3 rounded-lg text-xs flex items-center justify-center gap-1 shadow-sm">
+                <i data-lucide="shopping-cart" class="w-3.5 h-3.5"></i> Sell
+              </button>
+            </div>
+          `;
+        }
+
+        return `
+          <div class="bg-slate-900 border border-slate-800/90 rounded-2xl p-3 space-y-2 relative shadow-md">
+            <div class="flex gap-3">
+              <img src="${item.image || 'https://placehold.co/100x100/1e293b/amber?text=Baltina'}" 
+                   onerror="this.src='https://placehold.co/100x100/1e293b/amber?text=Baltina'" 
+                   class="w-20 h-20 rounded-xl object-cover border border-slate-800 shrink-0 bg-slate-950">
+              
+              <div class="flex-1 min-w-0 space-y-1">
+                <div class="flex items-start justify-between gap-1">
+                  <h4 class="font-bold text-sm text-white truncate">${item.name}</h4>
+                  ${badge}
+                </div>
+                
+                <p class="text-xs text-slate-400">Price</p>
+                <p class="text-base font-extrabold text-amber-400">${item.price.toFixed(2)} <span class="text-xs font-normal text-slate-300">ETB</span></p>
+              </div>
+            </div>
+            ${actionButtons}
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Helper Badge Generator
+    function getStatusBadge(status) {
+      switch(status) {
+        case 'in_stock':
+          return `<span class="bg-emerald-950/80 text-emerald-400 border border-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> In Shop</span>`;
+        case 'out_of_stock':
+          return `<span class="bg-rose-950/80 text-rose-400 border border-rose-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span> Shop Out</span>`;
+        case 'in_transit':
+          return `<span class="bg-sky-950/80 text-sky-400 border border-sky-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span> In Transit</span>`;
+        case 'factory_low':
+          return `<span class="bg-amber-950/80 text-amber-400 border border-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> Factory Low</span>`;
+        default:
+          return `<span class="bg-slate-800 text-slate-300 text-[10px] px-2 py-0.5 rounded-full">Unknown</span>`;
+      }
+    }
+
+    // Modal Handling for Add / Edit
+    function openAddItemModal() {
+      activeEditId = null;
+      document.getElementById('modalTitle').innerText = "Add New Baltina Product";
+      document.getElementById('itemForm').reset();
+      document.getElementById('imagePreview').classList.add('hidden');
+      document.getElementById('imagePlaceholderIcon').classList.remove('hidden');
+      base64Image = '';
+      document.getElementById('itemModal').classList.remove('hidden');
+    }
+
+    function closeItemModal() {
+      document.getElementById('itemModal').classList.add('hidden');
+    }
+
+    function handleImageSelected(event) {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          base64Image = e.target.result;
+          const img = document.getElementById('imagePreview');
+          img.src = base64Image;
+          img.classList.remove('hidden');
+          document.getElementById('imagePlaceholderIcon').classList.add('hidden');
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    function handleSaveItem(e) {
+      e.preventDefault();
+      const name = document.getElementById('itemNameInput').value.trim();
+      const price = parseFloat(document.getElementById('itemPriceInput').value);
+      const status = document.getElementById('itemStatusInput').value;
+
+      if (!name || isNaN(price)) return;
+
+      if (activeEditId) {
+        // Edit existing item
+        const index = items.findIndex(i => i.id === activeEditId);
+        if (index !== -1) {
+          items[index].name = name;
+          items[index].price = price;
+          items[index].status = status;
+          if (base64Image) items[index].image = base64Image;
+          syncItemToFirebase(items[index]);
+        }
+        showToast("Item updated successfully", "success");
+      } else {
+        // Create new item
+        const newItem = {
+          id: 'item-' + Date.now(),
+          name,
+          price,
+          status,
+          image: base64Image || 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?auto=format&fit=crop&w=300&q=80',
+          updatedAt: Date.now()
+        };
+        items.unshift(newItem);
+        syncItemToFirebase(newItem);
+        showToast("New Baltina item added!", "success");
+      }
+
+      closeItemModal();
+      renderItems();
+      populateSaleItemDropdown();
+    }
+
+    function editItem(id) {
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+
+      activeEditId = id;
+      document.getElementById('modalTitle').innerText = "Edit Baltina Item";
+      document.getElementById('itemNameInput').value = item.name;
+      document.getElementById('itemPriceInput').value = item.price;
+      document.getElementById('itemStatusInput').value = item.status;
+
+      if (item.image) {
+        const img = document.getElementById('imagePreview');
+        img.src = item.image;
+        img.classList.remove('hidden');
+        document.getElementById('imagePlaceholderIcon').classList.add('hidden');
+        base64Image = item.image;
+      }
+
+      document.getElementById('itemModal').classList.remove('hidden');
+    }
+
+    function deleteItem(id) {
+      items = items.filter(i => i.id !== id);
+      showToast("Item deleted", "info");
+      renderItems();
+      populateSaleItemDropdown();
+    }
+
+    // Modal Status / Dispatch (Mom / Admin)
+    let statusModalTargetId = null;
+    function openStatusModal(itemId) {
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+      statusModalTargetId = itemId;
+      document.getElementById('statusModalItemName').innerText = item.name + " (" + item.price.toFixed(2) + " ETB)";
+      document.getElementById('modalStatusSelect').value = item.status;
+      document.getElementById('modalStatusNote').value = '';
+      document.getElementById('statusModal').classList.remove('hidden');
+    }
+
+    function closeStatusModal() {
+      document.getElementById('statusModal').classList.add('hidden');
+    }
+
+    function confirmStatusUpdate() {
+      if (!statusModalTargetId) return;
+      const item = items.find(i => i.id === statusModalTargetId);
+      if (!item) return;
+
+      const newStatus = document.getElementById('modalStatusSelect').value;
+      const note = document.getElementById('modalStatusNote').value.trim();
+
+      item.status = newStatus;
+      syncItemToFirebase(item);
+
+      // Create Notification Feed Item
+      const notifMsg = `Mom updated "${item.name}" status to: ${getStatusLabel(newStatus)}. ${note ? 'Note: ' + note : ''}`;
+      addNotification('Factory Update', notifMsg, 'info');
+
+      closeStatusModal();
+      renderItems();
+      showToast("Status & notification updated!", "success");
+    }
+
+    function getStatusLabel(st) {
+      switch(st) {
+        case 'in_stock': return 'In Stock at Shop';
+        case 'out_of_stock': return 'Out of Stock';
+        case 'in_transit': return 'In Transit from Factory';
+        case 'factory_low': return 'Low Stock at Factory';
+        default: return st;
+      }
+    }
+
+    // Shopkeeper Action: Send Request Notification to Mom
+    function requestStockAlert(itemId) {
+      const item = items.find(i => i.id === itemId);
+      if (!item) return;
+
+      // Update status to out of stock
+      item.status = 'out_of_stock';
+      syncItemToFirebase(item);
+
+      const msg = `Shopkeeper reported: "${item.name}" is OUT OF STOCK at the physical shop! Please pack & dispatch from factory.`;
+      addNotification('Stock Request Alert', msg, 'alert');
+
+      renderItems();
+      showToast("Alert sent to Mom at Factory!", "success");
+    }
+
+    // Sales Logic & Calculations
+    function populateSaleItemDropdown() {
+      const select = document.getElementById('saleItemSelect');
+      select.innerHTML = '<option value="">-- Choose Item --</option>' + 
+        items.map(i => `<option value="${i.id}">${i.name} - ${i.price.toFixed(2)} ETB</option>`).join('');
+    }
+
+    function updateSaleTotalCalculation() {
+      const itemId = document.getElementById('saleItemSelect').value;
+      const qty = parseInt(document.getElementById('saleQtyInput').value) || 0;
+      const calcBox = document.getElementById('saleTotalCalculated');
+
+      const item = items.find(i => i.id === itemId);
+      if (item && qty > 0) {
+        const total = item.price * qty;
+        calcBox.innerText = `${total.toFixed(2)} ETB`;
+      } else {
+        calcBox.innerText = '0.00 ETB';
+      }
+    }
+
+    function quickLogSaleForItem(itemId) {
+      switchTab('sales');
+      document.getElementById('saleItemSelect').value = itemId;
+      document.getElementById('saleQtyInput').value = 1;
+      updateSaleTotalCalculation();
+    }
+
+    function handleLogSale(e) {
+      e.preventDefault();
+      const itemId = document.getElementById('saleItemSelect').value;
+      const qty = parseInt(document.getElementById('saleQtyInput').value) || 0;
+
+      const item = items.find(i => i.id === itemId);
+      if (!item || qty <= 0) return;
+
+      const total = item.price * qty;
+      const newSale = {
+        id: 'sale-' + Date.now(),
+        itemName: item.name,
+        qty: qty,
+        total: total,
+        timestamp: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        sellerRole: currentRole === 'admin' ? 'Mom (Admin)' : 'Shopkeeper'
+      };
+
+      sales.unshift(newSale);
+      syncSaleToFirebase(newSale);
+
+      showToast(`Sale recorded: ${total.toFixed(2)} ETB`, "success");
+      document.getElementById('saleForm').reset();
+      updateSaleTotalCalculation();
+      renderSales();
+    }
+
+    function renderSales() {
+      const historyList = document.getElementById('salesHistoryList');
+      const totalRev = sales.reduce((acc, s) => acc + s.total, 0);
+      const totalPacks = sales.reduce((acc, s) => acc + s.qty, 0);
+
+      document.getElementById('statTotalRevenue').innerText = `${totalRev.toFixed(2)} ETB`;
+      document.getElementById('statTotalCount').innerText = `${totalPacks} Packs`;
+
+      if (sales.length === 0) {
+        historyList.innerHTML = `
+          <div class="text-center py-6 text-slate-500 text-xs">
+            No sales recorded yet today.
+          </div>
+        `;
+        return;
+      }
+
+      historyList.innerHTML = sales.map(s => `
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 flex items-center justify-between">
+          <div class="space-y-0.5">
+            <p class="font-bold text-xs text-white">${s.itemName}</p>
+            <p class="text-[10px] text-slate-400">Qty: ${s.qty} • By ${s.sellerRole}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs font-extrabold text-amber-400">+${s.total.toFixed(2)} ETB</p>
+            <p class="text-[10px] text-slate-500">${s.timestamp}</p>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Notifications Management
+    function addNotification(title, message, type = 'info') {
+      const newNotif = {
+        id: 'notif-' + Date.now(),
+        title,
+        message,
+        type,
+        time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+      };
+      notifications.unshift(newNotif);
+      syncNotificationToFirebase(newNotif);
+
+      // Trigger Badge UI indicator if not currently on notifications tab
+      if (currentTab !== 'notifications') {
+        document.getElementById('unreadDot').classList.remove('hidden');
+      }
+
+      renderNotifications();
+    }
+
+    function renderNotifications() {
+      const container = document.getElementById('notificationsList');
+      const badge = document.getElementById('notifBadge');
+      badge.innerText = `${notifications.length} Alerts`;
+
+      if (notifications.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-10 text-slate-500 text-xs">
+            No stock alerts or factory updates.
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = notifications.map(n => {
+        const isAlert = n.type === 'alert';
+        return `
+          <div class="bg-slate-900 border ${isAlert ? 'border-rose-900/50 bg-rose-950/10' : 'border-slate-800'} rounded-2xl p-3.5 space-y-1">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold ${isAlert ? 'text-rose-400 flex items-center gap-1' : 'text-amber-400'}">
+                ${isAlert ? '<i data-lucide="bell-ring" class="w-3.5 h-3.5"></i>' : ''} ${n.title}
+              </span>
+              <span class="text-[10px] text-slate-500">${n.time}</span>
+            </div>
+            <p class="text-xs text-slate-300 leading-relaxed">${n.message}</p>
+          </div>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Toast UI Message System
+    function showToast(msg, type = "info") {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      let borderCol = "border-amber-500/40 text-amber-300 bg-slate-900/95";
+      if (type === "success") borderCol = "border-emerald-500/40 text-emerald-300 bg-slate-900/95";
+      if (type === "alert") borderCol = "border-rose-500/40 text-rose-300 bg-slate-900/95";
+
+      toast.className = `p-3 rounded-xl border ${borderCol} text-xs font-semibold shadow-xl flex items-center gap-2 backdrop-blur-md transform transition-all duration-300 translate-y-[-10px] opacity-0`;
+      toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 shrink-0"></i> <span>${msg}</span>`;
+
+      container.appendChild(toast);
+      lucide.createIcons();
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-[-10px]', 'opacity-0');
+      }, 50);
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-y-[-10px]');
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Firebase Firestore Sync Helpers (RULE 1 & 2 Compliant)
+    function setupFirebaseSync() {
+      if (!window.GB_APP || !window.GB_APP.db || !window.GB_APP.isFirebaseReady) return;
+
+      const db = window.GB_APP.db;
+      const appId = window.GB_APP.appId;
+
+      document.getElementById('syncStatusText').innerText = "Live Cloud Firestore Active";
+      document.getElementById('appSessionUser').innerText = `App ID: ${appId.substring(0,6)}`;
+
+      // Setup Realtime Listeners for items, sales & notifications
+      try {
+        const itemsRef = collection(db, 'artifacts', appId, 'public', 'data', 'items');
+        onSnapshot(itemsRef, (snapshot) => {
+          if (!snapshot.empty) {
+            const fetched = [];
+            snapshot.forEach(doc => fetched.push(doc.data()));
+            items = fetched.sort((a,b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+            renderItems();
+            populateSaleItemDropdown();
+          }
+        }, (err) => console.warn("Items sync warning:", err));
+
+        const salesRef = collection(db, 'artifacts', appId, 'public', 'data', 'sales');
+        onSnapshot(salesRef, (snapshot) => {
+          if (!snapshot.empty) {
+            const fetchedSales = [];
+            snapshot.forEach(doc => fetchedSales.push(doc.data()));
+            sales = fetchedSales.sort((a,b) => (b.timestamp || 0) - (a.timestamp || 0));
+            renderSales();
+          }
+        }, (err) => console.warn("Sales sync warning:", err));
+
+        const notifRef = collection(db, 'artifacts', appId, 'public', 'data', 'notifications');
+        onSnapshot(notifRef, (snapshot) => {
+          if (!snapshot.empty) {
+            const fetchedNotifs = [];
+            snapshot.forEach(doc => fetchedNotifs.push(doc.data()));
+            notifications = fetchedNotifs;
+            renderNotifications();
+          }
+        }, (err) => console.warn("Notif sync warning:", err));
+
+      } catch (e) {
+        console.warn("Firestore listener error:", e);
+      }
+    }
+
+    function syncItemToFirebase(itemData) {
+      if (!window.GB_APP || !window.GB_APP.db) return;
+      try {
+        const itemDoc = doc(window.GB_APP.db, 'artifacts', window.GB_APP.appId, 'public', 'data', 'items', itemData.id);
+        setDoc(itemDoc, itemData, { merge: true });
+      } catch(e) {
+        console.warn("Cloud item save skipped (Memory fallback active)");
+      }
+    }
+
+    function syncSaleToFirebase(saleData) {
+      if (!window.GB_APP || !window.GB_APP.db) return;
+      try {
+        const saleDoc = doc(window.GB_APP.db, 'artifacts', window.GB_APP.appId, 'public', 'data', 'sales', saleData.id);
+        setDoc(saleDoc, saleData);
+      } catch(e) {
+        console.warn("Cloud sale save skipped (Memory fallback active)");
+      }
+    }
+
+    function syncNotificationToFirebase(notifData) {
+      if (!window.GB_APP || !window.GB_APP.db) return;
+      try {
+        const notifDoc = doc(window.GB_APP.db, 'artifacts', window.GB_APP.appId, 'public', 'data', 'notifications', notifData.id);
+        setDoc(notifDoc, notifData);
+      } catch(e) {
+        console.warn("Cloud notification save skipped (Memory fallback active)");
+      }
+    }
+  </script>
+</body>
+</html>
