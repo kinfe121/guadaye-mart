@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Firestore connection test</title>
+<style>body{font:14px/1.5 monospace;background:#0f172a;color:#e2e8f0;padding:16px}button{padding:10px 16px;font-size:15px;border-radius:8px;border:0;background:#f59e0b;font-weight:700}pre{white-space:pre-wrap}</style>
+</head><body>
+<h3>Firestore connection test</h3>
+<button id="go">Run test</button>
+<pre id="out"></pre>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { initializeFirestore, doc, setDoc, getDocFromServer } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+// Paste the SAME config you use in index.html
+const cfg = {
+  apiKey: "AIzaSyCa4zXhFLTvp8eseRAQ-YEbOtzQZvaB4I8",
+  authDomain: "guadayemart.firebaseapp.com",
+  projectId: "guadayemart",
+  storageBucket: "guadayemart.firebasestorage.app",
+  messagingSenderId: "213102148191",
+  appId: "1:213102148191:web:cfbc402bd70af6028ef9ea"
+};
+
+const out = document.getElementById('out');
+const log = t => out.textContent += t + '\n';
+const limit = (p, ms, label) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(label + ' TIMED OUT after ' + ms / 1000 + 's')), ms))]);
+
+async function restTest() {
+  log('\n=== REST test (plain requests, no live channel) ===');
+  try {
+    const auth = getAuth(initializeApp(cfg, 'rest'));
+    const cred = await signInAnonymously(auth);
+    const tok = await cred.user.getIdToken();
+    const base = `https://firestore.googleapis.com/v1/projects/${cfg.projectId}/databases/(default)/documents`;
+    const h = { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' };
+    let r = await limit(fetch(base + '/items?pageSize=3', { headers: h }), 15000, 'REST read');
+    log(`A. READ items: HTTP ${r.status}\n   ${(await r.text()).slice(0, 400)}`);
+    r = await limit(fetch(base + '/notifications?documentId=diag-rest-' + Date.now(), {
+      method: 'POST', headers: h,
+      body: JSON.stringify({ fields: { title: { stringValue: 'Diagnostic test' }, message: { stringValue: 'REST test, safe to delete' }, type: { stringValue: 'info' }, createdAt: { integerValue: String(Date.now()) } } })
+    }), 15000, 'REST write');
+    log(`B. WRITE notification: HTTP ${r.status}\n   ${(await r.text()).slice(0, 400)}`);
+  } catch (e) { log('REST FAILED: ' + e.message); }
+}
+
+async function test(name, opts) {
+  log(`\n=== ${name} ===`);
+  try {
+    const app = initializeApp(cfg, name);
+    const auth = getAuth(app);
+    const t0 = performance.now();
+    const cred = await limit(signInAnonymously(auth), 10000, 'Anonymous sign-in');
+    log(`1. Sign-in OK (${Math.round(performance.now() - t0)} ms), uid ${cred.user.uid.slice(0, 6)}...`);
+    const db = initializeFirestore(app, opts);
+    try {
+      const r = await limit(getDocFromServer(doc(db, 'notifications', 'does-not-exist')), 15000, 'Read');
+      log(`1b. Server READ answered OK (doc exists: ${r.exists()}). Database is reachable.`);
+    } catch (e) {
+      log(`1b. Server READ failed: [${e.code || 'no-code'}] ${e.message}`);
+    }
+    const id = 'notif-diag-' + Date.now();
+    const t1 = performance.now();
+    await limit(setDoc(doc(db, 'notifications', id), { title: 'Diagnostic test', message: 'Connection test (' + name + '), safe to delete', type: 'info', createdAt: Date.now() }), 12000, 'Write');
+    log(`2. Write CONFIRMED by server (${Math.round(performance.now() - t1)} ms)`);
+    const snap = await limit(getDocFromServer(doc(db, 'notifications', id)), 10000, 'Read');
+    log(`3. Read back from server: ${snap.exists() ? 'OK' : 'missing'}`);
+    log(`RESULT: ${name} WORKS`);
+  } catch (e) {
+    log(`FAILED: ${e.code || ''} ${e.message}`);
+    log(`RESULT: ${name} does NOT work`);
+  }
+}
+
+document.getElementById('go').onclick = async () => {
+  out.textContent = 'Device time: ' + new Date().toString() + '\nOnline: ' + navigator.onLine + '\n';
+  await restTest();
+  log('\nDone. Send me this whole output.');
+};
+</script>
+</body></html>
